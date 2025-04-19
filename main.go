@@ -30,6 +30,8 @@ func main() {
 
 	checkoutCmd := flag.NewFlagSet("checkout", flag.ExitOnError)
 
+	tagCmd := flag.NewFlagSet("tag", flag.ExitOnError)
+
 	if len(os.Args) < 2 {
 		die("expected subcommand")
 	}
@@ -61,6 +63,9 @@ func main() {
 	case checkoutCmd.Name():
 		checkoutCmd.Parse(subArgs)
 		doCheckout(checkoutCmd.Args())
+	case tagCmd.Name():
+		tagCmd.Parse(subArgs)
+		doTag(tagCmd.Args())
 	}
 }
 
@@ -96,7 +101,7 @@ func doCatFile(args []string) {
 		die("expected object hash")
 	}
 
-	content, err := data.GetObject(args[0], data.NoneType)
+	content, err := data.GetObject(mustGetOID(args[0]), data.NoneType)
 	if err != nil {
 		die(err)
 	}
@@ -122,7 +127,7 @@ func doReadTree(args []string) {
 		die("expected tree hash")
 	}
 
-	err := base.ReadTree(args[0])
+	err := base.ReadTree(mustGetOID(args[0]))
 	if err != nil {
 		die(err)
 	}
@@ -147,12 +152,12 @@ func doLog(logFrom string) {
 	var err error
 
 	if logFrom == "" {
-		oid, err = data.GetHead()
+		oid, err = data.GetRef(data.HeadRef)
 		if err != nil {
 			die(err)
 		}
 	} else {
-		oid = logFrom
+		oid = mustGetOID(logFrom)
 	}
 
 	for oid != "" {
@@ -173,10 +178,50 @@ func doCheckout(args []string) {
 		die("expected commit hash")
 	}
 
-	err := base.Checkout(args[0])
+	err := base.Checkout(mustGetOID(args[0]))
 	if err != nil {
 		die(err)
 	}
+}
+
+func doTag(args []string) {
+	if len(args) < 1 {
+		die("tag name is required")
+	}
+
+	tag := args[0]
+	var oid string
+
+	if len(args) > 1 {
+		oid = mustGetOID(args[1])
+	}
+
+	if oid == "" {
+		head, err := data.GetRef(data.HeadRef)
+		if err != nil {
+			die(err)
+		}
+
+		oid = head
+	}
+
+	err := base.CreateTag(tag, oid)
+	if err != nil {
+		die(err)
+	}
+}
+
+func mustGetOID(name string) string {
+	oid, err := base.GetOID(name)
+	if err != nil {
+		die(err)
+	}
+
+	if oid == "" {
+		die(fmt.Errorf("%q ref not found", name))
+	}
+
+	return oid
 }
 
 func getwd() string {

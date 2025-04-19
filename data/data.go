@@ -18,6 +18,10 @@ const (
 	CommitType ObjectType = "commit"
 )
 
+const (
+	HeadRef string = "HEAD"
+)
+
 const UGitDir = ".ugit"
 
 func Initialize() error {
@@ -34,12 +38,19 @@ func Initialize() error {
 	return nil
 }
 
-func SetHead(oid string) error {
-	return os.WriteFile(filepath.Join(UGitDir, "HEAD"), []byte(oid), 0666)
+func UpdateRef(ref, oid string) error {
+	refPath := filepath.Join(UGitDir, ref)
+
+	err := os.MkdirAll(filepath.Dir(refPath), 0750)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(refPath, []byte(oid), 0666)
 }
 
-func GetHead() (string, error) {
-	oid, err := os.ReadFile(filepath.Join(UGitDir, "HEAD"))
+func GetRef(ref string) (string, error) {
+	oid, err := os.ReadFile(filepath.Join(UGitDir, ref))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", nil

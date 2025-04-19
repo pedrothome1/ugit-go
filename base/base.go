@@ -2,6 +2,7 @@ package base
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -10,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"ugit-go/data"
+	"unicode"
 )
 
 type CommitData struct {
@@ -128,7 +130,7 @@ func Commit(msg string) (string, error) {
 		return "", err
 	}
 
-	head, err := data.GetHead()
+	head, err := data.GetRef(data.HeadRef)
 	if err != nil {
 		return "", err
 	}
@@ -148,7 +150,7 @@ func Commit(msg string) (string, error) {
 		return "", err
 	}
 
-	err = data.SetHead(commitOID)
+	err = data.UpdateRef(data.HeadRef, commitOID)
 	if err != nil {
 		return "", err
 	}
@@ -210,12 +212,52 @@ func Checkout(oid string) error {
 		return err
 	}
 
-	err = data.SetHead(oid)
+	err = data.UpdateRef(data.HeadRef, oid)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func CreateTag(name, oid string) error {
+	return data.UpdateRef(filepath.Join("refs", "tags", name), oid)
+}
+
+func GetOID(name string) (string, error) {
+	if name == "@" {
+		name = data.HeadRef
+	}
+
+	tryRefs := []string{
+		name,
+		filepath.Join("refs", name),
+		filepath.Join("refs", "tags", name),
+		filepath.Join("refs", "heads", name),
+	}
+
+	for _, ref := range tryRefs {
+		oid, err := data.GetRef(ref)
+		if err != nil {
+			return "", err
+		}
+
+		if oid != "" {
+			return oid, nil
+		}
+	}
+
+	if len(name) != sha1.Size*2 {
+		return "", fmt.Errorf("%q size is not a sha1 hex digest size", name)
+	}
+
+	for _, r := range name {
+		if !strings.ContainsRune("0123456789abcdef", unicode.ToLower(r)) {
+			return "", fmt.Errorf("%q is not a valid sha1 hex digest", name)
+		}
+	}
+
+	return name, nil
 }
 
 func emptyCurrentDir() error {
