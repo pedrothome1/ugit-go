@@ -12,8 +12,10 @@ import (
 type ObjectType string
 
 const (
-	NoneType ObjectType = "none"
-	BlobType ObjectType = "blob"
+	NoneType   ObjectType = "none"
+	BlobType   ObjectType = "blob"
+	TreeType   ObjectType = "tree"
+	CommitType ObjectType = "commit"
 )
 
 const UGitDir = ".ugit"
@@ -32,8 +34,25 @@ func Initialize() error {
 	return nil
 }
 
+func SetHead(oid string) error {
+	return os.WriteFile(filepath.Join(UGitDir, "HEAD"), []byte(oid), 0666)
+}
+
+func GetHead() (string, error) {
+	oid, err := os.ReadFile(filepath.Join(UGitDir, "HEAD"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+
+		return "", err
+	}
+
+	return string(oid), nil
+}
+
 func HashObject(data []byte, typ ObjectType) (string, error) {
-	buf := bytes.NewBuffer(make([]byte, 0, len(data) + len(typ) + 1))
+	buf := bytes.NewBuffer(make([]byte, 0, len(data)+len(typ)+1))
 	buf.Write([]byte(typ))
 	buf.WriteByte(0)
 	buf.Write(data)
