@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -222,6 +223,37 @@ func Checkout(oid string) error {
 
 func CreateTag(name, oid string) error {
 	return data.UpdateRef(filepath.Join("refs", "tags", name), oid)
+}
+
+func AllCommitsAndParents(oids []string) ([]string, error) {
+	oidsSet := make(map[string]struct{}, len(oids))
+	for _, oid := range oids {
+		oidsSet[oid] = struct{}{}
+	}
+	visitedSet := make(map[string]struct{}, len(oids))
+
+	var result []string
+
+	for len(oidsSet) > 0 {
+		oid := slices.Collect(maps.Keys(oidsSet))[rand.IntN(len(oidsSet))]
+		delete(oidsSet, oid)
+
+		if _, ok := visitedSet[oid]; oid == "" || ok {
+			continue
+		}
+
+		visitedSet[oid] = struct{}{}
+		result = append(result, oid)
+
+		commit, err := GetCommit(oid)
+		if err != nil {
+			return nil, err
+		}
+
+		oidsSet[commit.Parent] = struct{}{}
+	}
+
+	return result, nil
 }
 
 func GetOID(name string) (string, error) {

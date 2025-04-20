@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -23,6 +24,11 @@ const (
 )
 
 const UGitDir = ".ugit"
+
+type RefData struct {
+	Name string
+	OID  string
+}
 
 func Initialize() error {
 	err := os.Mkdir(UGitDir, 0750)
@@ -60,6 +66,42 @@ func GetRef(ref string) (string, error) {
 	}
 
 	return string(oid), nil
+}
+
+func AllRefs() ([]*RefData, error) {
+	var result []*RefData
+
+	refs := []string{HeadRef}
+
+	err := filepath.Walk(filepath.Join(UGitDir, "refs"), func(path string, info fs.FileInfo, err error) error {
+		if !info.IsDir() {
+			relPath, err := filepath.Rel(UGitDir, path)
+			if err != nil {
+				return err
+			}
+
+			refs = append(refs, relPath)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ref := range refs {
+		oid, err := GetRef(ref)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, &RefData{
+			Name: ref,
+			OID:  oid,
+		})
+	}
+
+	return result, nil
 }
 
 func HashObject(data []byte, typ ObjectType) (string, error) {

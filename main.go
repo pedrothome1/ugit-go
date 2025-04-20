@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
+	"strings"
 	"ugit-go/base"
 	"ugit-go/data"
 )
@@ -31,6 +34,8 @@ func main() {
 	checkoutCmd := flag.NewFlagSet("checkout", flag.ExitOnError)
 
 	tagCmd := flag.NewFlagSet("tag", flag.ExitOnError)
+
+	kCmd := flag.NewFlagSet("k", flag.ExitOnError)
 
 	if len(os.Args) < 2 {
 		die("expected subcommand")
@@ -66,6 +71,9 @@ func main() {
 	case tagCmd.Name():
 		tagCmd.Parse(subArgs)
 		doTag(tagCmd.Args())
+	case kCmd.Name():
+		kCmd.Parse(subArgs)
+		doK(kCmd.Args())
 	}
 }
 
@@ -209,6 +217,45 @@ func doTag(args []string) {
 	if err != nil {
 		die(err)
 	}
+}
+
+func doK(_ []string) {
+	var dot strings.Builder
+	dot.WriteString("digraph commits {\n")
+
+	refs, err := data.AllRefs()
+	if err != nil {
+		die(err)
+	}
+
+	oidsSet := make(map[string]struct{})
+
+	for _, ref := range refs {
+		dot.WriteString(fmt.Sprintf("\"%s\" [shape=note]\n", ref.Name))
+		dot.WriteString(fmt.Sprintf("\"%s\" -> \"%s\"\n", ref.Name, ref.OID))
+		oidsSet[ref.OID] = struct{}{}
+	}
+
+	all, err := base.AllCommitsAndParents(slices.Collect(maps.Keys(oidsSet)))
+	if err != nil {
+		die(err)
+	}
+
+	for _, oid := range all {
+		commit, err := base.GetCommit(oid)
+		if err != nil {
+			die(err)
+		}
+
+		dot.WriteString(fmt.Sprintf("\"%s\" [shape=box style=filled label=\"%s\"]\n", oid, oid[:10]))
+
+		if commit.Parent != "" {
+			dot.WriteString(fmt.Sprintf("\"%s\" -> \"%s\"\n", oid, commit.Parent))
+		}
+	}
+
+	dot.WriteString("}")
+	fmt.Println(dot.String())
 }
 
 func mustGetOID(name string) string {
