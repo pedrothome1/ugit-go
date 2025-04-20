@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
+	"github.com/gammazero/deque"
 	"io/fs"
 	"maps"
-	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -226,17 +226,17 @@ func CreateTag(name, oid string) error {
 }
 
 func AllCommitsAndParents(oids []string) ([]string, error) {
-	oidsSet := make(map[string]struct{}, len(oids))
+	var oidsDeque deque.Deque[string]
 	for _, oid := range oids {
-		oidsSet[oid] = struct{}{}
+		oidsDeque.PushBack(oid)
 	}
+
 	visitedSet := make(map[string]struct{}, len(oids))
 
 	var result []string
 
-	for len(oidsSet) > 0 {
-		oid := slices.Collect(maps.Keys(oidsSet))[rand.IntN(len(oidsSet))]
-		delete(oidsSet, oid)
+	for oidsDeque.Len() > 0 {
+		oid := oidsDeque.PopFront()
 
 		if _, ok := visitedSet[oid]; oid == "" || ok {
 			continue
@@ -250,7 +250,7 @@ func AllCommitsAndParents(oids []string) ([]string, error) {
 			return nil, err
 		}
 
-		oidsSet[commit.Parent] = struct{}{}
+		oidsDeque.PushFront(commit.Parent)
 	}
 
 	return result, nil

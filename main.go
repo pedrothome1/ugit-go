@@ -168,7 +168,12 @@ func doLog(logFrom string) {
 		oid = mustGetOID(logFrom)
 	}
 
-	for oid != "" {
+	all, err := base.AllCommitsAndParents([]string{oid})
+	if err != nil {
+		die(err)
+	}
+
+	for _, oid := range all {
 		commit, err := base.GetCommit(oid)
 		if err != nil {
 			die(err)
@@ -176,8 +181,6 @@ func doLog(logFrom string) {
 
 		fmt.Printf("commit %s\n", oid)
 		fmt.Printf("%s\n\n", commit.Message)
-
-		oid = commit.Parent
 	}
 }
 
